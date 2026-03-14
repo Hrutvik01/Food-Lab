@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Food Lab | Culinary Art Meets Scientific Precision</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Roboto Mono', 'monospace'],
+                    },
+                    colors: {
+                        lab: {
+                            bg: '#020617', // slate-950
+                            panel: 'rgba(255, 255, 255, 0.03)',
+                            explorer: '#06b6d4', // cyan-500
+                            master: '#f97316', // orange-500
+                            root: '#e11d48', // rose-600
+                            success: '#10b981' // emerald-500
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .text-glow {
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .box-glow-cyan {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), inset 0 0 10px rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.4);
+        }
+
+        .box-glow-orange {
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.3), inset 0 0 10px rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.4);
+        }
+
+        .box-glow-rose {
+            box-shadow: 0 0 20px rgba(225, 29, 72, 0.3), inset 0 0 10px rgba(225, 29, 72, 0.1);
+            border-color: rgba(225, 29, 72, 0.4);
+        }
+
+        /* 3D Perspective Utilities */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        
+        .preserve-3d {
+            transform-style: preserve-3d;
+        }
+
+        /* Hide scrollbar for clean UI */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #020617; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4); 
+        }
+    </style>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useEffect, useRef } = React;
+
+        // --- COMPONENTS ---
+
+        const Hero = () => {
+            const titleRef = useRef(null);
+            const imageContainerRef = useRef(null);
+            const imageRef = useRef(null);
+
+            useEffect(() => {
+                // Text Assembly Animation
+                const chars = titleRef.current.children;
+                gsap.fromTo(chars, 
+                    { opacity: 0, z: 200, x: () => Math.random() * 400 - 200, y: () => Math.random() * 400 - 200, rotation: () => Math.random() * 90 - 45 },
+                    { opacity: 1, z: 0, x: 0, y: 0, rotation: 0, duration: 2, stagger: 0.1, ease: "power4.out" }
+                );
+
+                gsap.fromTo(".hero-sub", 
+                    { opacity: 0, y: 30 }, 
+                    { opacity: 1, y: 0, duration: 1.5, delay: 1, ease: "power3.out", stagger: 0.2 }
+                );
+
+                // 3D Mouse Move Effect
+                const handleMouseMove = (e) => {
+                    const container = imageContainerRef.current;
+                    if (!container) return;
+                    
+                    const rect = container.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    const rotateX = ((y - centerY) / centerY) * -15; // Max rotation
+                    const rotateY = ((x - centerX) / centerX) * 15;
+
+                    gsap.to(imageRef.current, {
+                        rotateX: rotateX,
+                        rotateY: rotateY,
+                        duration: 0.5,
+                        ease: "power2.out"
+                    });
+                };
+
+                const handleMouseLeave = () => {
+                    gsap.to(imageRef.current, {
+                        rotateX: 0,
+                        rotateY: 0,
+                        duration: 1,
+                        ease: "power2.out"
+                    });
+                };
+
+                const containerEl = imageContainerRef.current;
+                containerEl.addEventListener("mousemove", handleMouseMove);
+                containerEl.addEventListener("mouseleave", handleMouseLeave);
+
+                return () => {
+                    containerEl.removeEventListener("mousemove", handleMouseMove);
+                    containerEl.removeEventListener("mouseleave", handleMouseLeave);
+                };
+            }, []);
+
+            const scrollToFeatures = () => {
+                const featuresSection = document.getElementById('features-section');
+                if (featuresSection) {
+                    featuresSection.scrollIntoView({ behavior: 'smooth' });
+                }
+            };
+
+            const title = "THE FOOD LAB";
+
+            return (
+                <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden py-20">
+                    {/* Ambient Background Glow */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-900/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+                    <div className="container mx-auto px-6 z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                        <div className="flex flex-col items-start">
+                            <h1 className="text-6xl md:text-8xl font-bold font-sans tracking-tighter mb-4 perspective-1000 flex flex-wrap" ref={titleRef}>
+                                {title.split("").map((char, index) => (
+                                    <span key={index} className="inline-block preserve-3d">
+                                        {char === " " ? "\u00A0" : char}
+                                    </span>
+                                ))}
+                            </h1>
+                            <h2 className="hero-sub text-xl md:text-2xl text-cyan-400 font-mono mb-6 border-l-4 border-cyan-500 pl-4">
+                                Where Culinary Art Meets Scientific Precision.
+                            </h2>
+                            <p className="hero-sub text-slate-300 font-sans mb-8 max-w-lg leading-relaxed text-lg">
+                                Welcome to a next-generation platform engineered for molecular gastronomy enthusiasts, master chefs, and data-driven foodies. The Food Lab bridges the gap between cooking and data science, providing you with elite tools to experiment, document precise recipe protocols, and analyze your culinary creations in real-time.
+                            </p>
+                            <div className="hero-sub flex flex-wrap gap-4">
+                                <button className="px-8 py-4 bg-white/10 glass-panel hover:bg-white/20 text-white font-mono uppercase tracking-widest text-sm transition-all duration-300 border border-white/20 hover:border-cyan-500 hover:shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                                    <a href="login_1.html">
+                                    Enter the Portal
+                                    </a>
+                                </button>
+                                <button onClick={scrollToFeatures} className="px-8 py-4 bg-transparent text-slate-300 hover:text-white font-mono uppercase tracking-widest text-sm transition-all duration-300 hover:bg-white/5 rounded">
+                                    Explore Features ↓
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="perspective-1000 w-full h-[400px] md:h-[500px]" ref={imageContainerRef}>
+                            <div className="w-full h-full preserve-3d relative transition-transform" ref={imageRef}>
+                                <div className="absolute inset-0 glass-panel rounded-2xl overflow-hidden box-glow-cyan p-2">
+                                    <img 
+                                        src="https://images.unsplash.com/photo-1606787366850-de6330128bfc?auto=format&fit=crop&q=80&w=1200" 
+                                        alt="Molecular Gastronomy Laboratory" 
+                                        className="w-full h-full object-cover rounded-xl opacity-80"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-lab-bg via-transparent to-transparent"></div>
+                                    
+                                    {/* Floating UI Elements inside 3D space */}
+                                    <div className="absolute top-6 left-6 glass-panel px-4 py-2 rounded-lg border-cyan-500/50 flex items-center gap-3 transform translate-z-[50px]">
+                                        <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                                        <span className="font-mono text-xs text-cyan-400">System Online</span>
+                                    </div>
+                                    <div className="absolute bottom-6 right-6 glass-panel px-4 py-2 rounded-lg border-white/10 transform translate-z-[80px]">
+                                        <span className="font-mono text-xs text-slate-300">Auth Protocol: <span className="text-success text-glow">Verified</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        const FeatureCard = ({ title, description, features, accentClass, imageSrc, reverse }) => {
+            const cardRef = useRef(null);
+
+            useEffect(() => {
+                let ctx = gsap.context(() => {
+                    gsap.fromTo(cardRef.current,
+                        { opacity: 0, y: 100 },
+                        { 
+                            opacity: 1, 
+                            y: 0, 
+                            duration: 1, 
+                            ease: "power3.out",
+                            scrollTrigger: {
+                                trigger: cardRef.current,
+                                containerAnimation: window.horizontalScroll,
+                                start: "left center+=200",
+                                toggleActions: "play none none reverse"
+                            }
+                        }
+                    );
+                });
+                return () => ctx.revert();
+            }, []);
+
+            return (
+                <div className="w-screen h-screen flex-shrink-0 flex items-center justify-center p-8 lg:p-24 pt-20">
+                    <div ref={cardRef} className={`w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-16 items-center ${reverse ? 'lg:grid-flow-col-dense' : ''}`}>
+                        
+                        <div className={`flex flex-col space-y-6 ${reverse ? 'lg:col-start-2' : ''}`}>
+                            <h2 className={`text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight font-sans ${accentClass.textGlow}`}>
+                                {title}
+                            </h2>
+                            <p className="text-base lg:text-lg text-slate-400 font-mono leading-relaxed border-l-2 pl-4 border-slate-700">
+                                {description}
+                            </p>
+                            <ul className="space-y-4 mt-6">
+                                {features.map((feat, idx) => (
+                                    <li key={idx} className="flex items-start group">
+                                        <span className={`mr-4 mt-1 font-mono text-sm ${accentClass.text}`}>[0{idx + 1}]</span>
+                                        <div>
+                                            <strong className="block text-white font-sans">{feat.name}</strong>
+                                            <span className="text-slate-500 text-sm">{feat.desc}</span>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className={`perspective-1000 h-[400px] lg:h-[600px] w-full ${reverse ? 'lg:col-start-1' : ''}`}>
+                            <div className={`glass-panel w-full h-full rounded-3xl p-4 ${accentClass.boxGlow} relative overflow-hidden preserve-3d transform rotate-y-[-5deg] hover:rotate-y-[0deg] transition-transform duration-700`}>
+                                <img src={imageSrc} alt={title} className="w-full h-full object-cover rounded-2xl opacity-70 filter brightness-75 contrast-125 saturate-50 hover:saturate-100 transition-all duration-500" />
+                                <div className={`absolute inset-0 bg-gradient-to-tr ${accentClass.overlay} mix-blend-overlay`}></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const HorizontalScrollSection = () => {
+            const containerRef = useRef(null);
+            const sliderRef = useRef(null);
+
+            useEffect(() => {
+                gsap.registerPlugin(ScrollTrigger);
+
+                const sections = gsap.utils.toArray(".horizontal-panel");
+                
+                const scrollTween = gsap.to(sections, {
+                    xPercent: -100 * (sections.length - 1),
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: containerRef.current,
+                        pin: true,
+                        scrub: 1,
+                        snap: 1 / (sections.length - 1),
+                        end: () => "+=" + sliderRef.current.offsetWidth
+                    }
+                });
+
+                window.horizontalScroll = scrollTween;
+
+                return () => {
+                    scrollTween.kill();
+                };
+            }, []);
+
+            const featuresData = [
+                {
+                    title: "The Access Portal",
+                    description: "The secure entry point handling authentication, registration, and initial profile setup for all lab personnel.",
+                    accentClass: { text: "text-slate-300", textGlow: "text-shadow", boxGlow: "border-white/20", overlay: "from-slate-800 to-transparent" },
+                    imageSrc: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200", // Digital Gateway / Network
+                    reverse: false,
+                    features: [
+                        { name: "Role-Based Routing", desc: "Select identity (Explorer, Recipe Master, Admin) pre-login for immediate system redirection." },
+                        { name: "Dynamic Hero Interface", desc: "Adaptive UI rendering based on selected access level." },
+                        { name: "Military-Grade Verification", desc: "EmailJS OTP 4-digit synchronization for newly registered scientists." },
+                        { name: "Profile Initialization", desc: "Base64 local image encoding and baseline data sync via localStorage." }
+                    ]
+                },
+                {
+                    title: "The Subject Dashboard",
+                    description: "The primary interface for Explorers to discover, interact with, and analyze experimental recipes.",
+                    accentClass: { text: "text-lab-explorer", textGlow: "text-cyan-400 text-glow", boxGlow: "box-glow-cyan", overlay: "from-cyan-900/50 to-transparent" },
+                    imageSrc: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&q=80&w=1200", // Culinary Prep / Ingredients
+                    reverse: true,
+                    features: [
+                        { name: "Real-Time Global Sync", desc: "Instant Discovery Feed updates upon new protocol publication." },
+                        { name: "XP & Leveling", desc: "Dynamic progression tracking. +150 XP per successful experiment." },
+                        { name: "Global Unit Converter", desc: "Platform-wide instantaneous toggle between Metric (g) and Imperial (oz)." },
+                        { name: "Scientific Analyzer Modal", desc: "Ingredient scaling, step-by-step phased execution, and Voice Protocol simulator." }
+                    ]
+                },
+                {
+                    title: "The Master Portal",
+                    description: "The elite creator studio where Recipe Masters engineer and publish their culinary protocols.",
+                    accentClass: { text: "text-lab-master", textGlow: "text-orange-500 text-glow", boxGlow: "box-glow-orange", overlay: "from-orange-900/50 to-transparent" },
+                    imageSrc: "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80&w=1200", // Chef in action / Fire
+                    reverse: false,
+                    features: [
+                        { name: "Master-Themed UI", desc: "Distinctive high-contrast orange interface designating creator status." },
+                        { name: "Creator Analytics", desc: "Real-time telemetry on protocol reach, global saves, and Master XP." },
+                        { name: "Dynamic Protocol Publisher", desc: "Base64 uploads, dual-unit reagent inputs, and phased execution rows." },
+                        { name: "Global Pushing", desc: "Instantaneous database sync rewarding +500 XP per publication." }
+                    ]
+                },
+                {
+                    title: "Root Control",
+                    description: "The overarching command center designed for absolute ecosystem monitoring and database management.",
+                    accentClass: { text: "text-lab-root", textGlow: "text-rose-600 text-glow", boxGlow: "box-glow-rose", overlay: "from-rose-900/50 to-transparent" },
+                    imageSrc: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200", // Data Dashboard / Analytics
+                    reverse: true,
+                    features: [
+                        { name: "Real-Time Personnel DB", desc: "Live matrix displaying Subject profiles, access levels, and XP." },
+                        { name: "Visual Analytics", desc: "Chart.js topographical mapping of Master to Explorer ratios." },
+                        { name: "Live Search & PDF Audits", desc: "Instant filtering and automated jsPDF ecosystem report generation." },
+                        { name: "Deep Subject Dossier", desc: "Granular inspection of saved protocols, reagent carts, and publication history." }
+                    ]
+                }
+            ];
+
+            return (
+                <div id="features-section" ref={containerRef} className="w-full h-screen overflow-hidden bg-lab-bg">
+                    <div ref={sliderRef} className="flex h-full w-[400vw]">
+                        {featuresData.map((data, index) => (
+                            <div key={index} className="horizontal-panel w-screen h-full relative">
+                                {/* Background grid for lab feel */}
+                                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none"></div>
+                                <FeatureCard {...data} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const Footer = () => {
+            return (
+                <footer className="w-full py-12 border-t border-white/10 glass-panel relative z-10 bg-lab-bg">
+                    <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="font-sans font-bold text-2xl tracking-tighter">
+                            THE FOOD LAB <span className="text-cyan-500">.</span>
+                        </div>
+                        <div className="font-mono text-sm text-slate-500">
+                            System Status: <span className="text-success text-glow">Nominal</span> | Local Environment Data Synced.
+                        </div>
+                        <div className="font-mono text-xs text-slate-600">
+                            &copy; {new Date().getFullYear()} Root Control Admin. All protocols enforced.
+                        </div>
+                    </div>
+                </footer>
+            );
+        };
+
+        const App = () => {
+            return (
+                <main className="w-full min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+                    <Hero />
+                    <HorizontalScrollSection />
+                    <Footer />
+                </main>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

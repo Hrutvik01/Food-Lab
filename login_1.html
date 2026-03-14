@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Food Lab | Access Portal</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { background: #050505; color: white; font-family: 'Inter', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .glass-panel { background: #11111a; border-radius: 32px; border: 1px solid #1a1a24; display: flex; width: 1000px; max-width: 95%; height: 650px; overflow: hidden; box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8); }
+        input { background: #0a0a0f !important; border: 1px solid #2d2d3d !important; color: white !important; outline: none; transition: 0.3s; }
+        input:focus { border-color: #7c3aed !important; box-shadow: 0 0 10px rgba(124, 58, 237, 0.1); }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // CONFIGURATION
+        const CONFIG = { PUBLIC_KEY: "8hivsd7bazL6kFxlr", SERVICE_ID: "service_jr29h5g", TEMPLATE_ID: "template_yjn2wv8" };
+        const SUPER_ADMIN = { email: "hrutvikp29@gmail.com", pass: "Jampu@0929" };
+
+        const ROLE_PICS = {
+            'User': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800',
+            'Recipe Master': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=800',
+            'Admin': 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800'
+        };
+
+        const AccessPortal = () => {
+            const [view, setView] = useState('auth'); // auth | otp | setup
+            const [mode, setMode] = useState('login');
+            const [role, setRole] = useState('User');
+            const [creds, setCreds] = useState({ email: '', pass: '' });
+            const [otp, setOtp] = useState({ gen: '', input: '' });
+            const [profile, setProfile] = useState({ name: '', phone: '', pfp: null });
+            const [msg, setMsg] = useState({ text: '', type: '' });
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => { emailjs.init(CONFIG.PUBLIC_KEY); }, []);
+
+            const handleAuth = (e) => {
+                e.preventDefault();
+                setLoading(true); setMsg({ text: '', type: '' });
+                
+                setTimeout(() => {
+                    setLoading(false);
+                    const users = JSON.parse(localStorage.getItem('lab_users') || '[]');
+                    
+                    if (mode === 'signup') {
+                        if (users.find(u => u.email === creds.email && u.role === role)) {
+                            return setMsg({ text: `Subject already registered as ${role}.`, type: 'error' });
+                        }
+                        const code = Math.floor(1000 + Math.random() * 9000).toString();
+                        setOtp({ ...otp, gen: code });
+                        setView('otp');
+                        emailjs.send(CONFIG.SERVICE_ID, CONFIG.TEMPLATE_ID, { to_email: creds.email, otp_code: code });
+                    } else {
+                        // LOGIN LOGIC - WITH UPDATED ROUTING
+                        if (role === 'Admin') {
+                            if (creds.email === SUPER_ADMIN.email && creds.pass === SUPER_ADMIN.pass) {
+                                setMsg({ text: "Admin Identity Confirmed. Accessing Vault...", type: 'success' });
+                                setTimeout(() => window.location.href = "admin_1.html", 1000);
+                            } else {
+                                setMsg({ text: "CRITICAL: Unauthorized Admin Access.", type: 'error' });
+                            }
+                        } else {
+                            const user = users.find(u => u.email === creds.email && u.password === creds.pass && u.role === role);
+                            if (user) {
+                                localStorage.setItem('active_session', JSON.stringify(user));
+                                setMsg({ text: "Access Granted. Initializing Dashboard...", type: 'success' });
+                                
+                                // Route based on specific role
+                                setTimeout(() => {
+                                    if (role === 'Recipe Master') {
+                                        window.location.href = "recipeMaster_1.html";
+                                    } else {
+                                        window.location.href = "user_dashboard.html";
+                                    }
+                                }, 1000);
+                                
+                            } else {
+                                setMsg({ text: "Invalid credentials or role mismatch.", type: 'error' });
+                            }
+                        }
+                    }
+                }, 1200);
+            };
+
+            const verifyOtp = () => {
+                setLoading(true);
+                setTimeout(() => {
+                    setLoading(false);
+                    if (otp.input === otp.gen) setView('setup');
+                    else setMsg({ text: "Invalid OTP Code.", type: 'error' });
+                }, 800);
+            };
+
+            const finalizeProfile = (e) => {
+                e.preventDefault();
+                const users = JSON.parse(localStorage.getItem('lab_users') || '[]');
+                const newUser = { 
+                    email: creds.email, password: creds.pass, role, 
+                    name: profile.name, phone: profile.phone, pfp: profile.pfp || 'https://via.placeholder.com/150/7c3aed/ffffff?text=U',
+                    xp: 0, saved: [], reagents: []
+                };
+                users.push(newUser);
+                localStorage.setItem('lab_users', JSON.stringify(users));
+                localStorage.setItem('active_session', JSON.stringify(newUser));
+                window.location.href = "user_dashboard.html";
+            };
+
+            const handlePfp = (e) => {
+                const reader = new FileReader();
+                reader.onload = () => setProfile({ ...profile, pfp: reader.result });
+                if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+            };
+
+            return (
+                <div className="glass-panel">
+                    {/* LEFT HERO */}
+                    <div className="hidden md:flex w-[45%] bg-black relative flex-col justify-between p-12">
+                        <img src={ROLE_PICS[role]} className="absolute inset-0 w-full h-full object-cover opacity-40 transition-all duration-700" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] to-transparent"></div>
+                        <h2 className="relative z-10 text-2xl font-black italic text-violet-500">THE FOOD LAB</h2>
+                        <div className="relative z-10 fade-in" key={role}>
+                            <h1 className="text-5xl font-black italic uppercase leading-none">{role}</h1>
+                            <p className="text-gray-400 mt-4 font-mono text-xs uppercase tracking-widest">Clearance: Level 0{role === 'Admin' ? '3' : '1'}</p>
+                        </div>
+                    </div>
+
+                    {/* RIGHT FORM */}
+                    <div className="flex-1 p-12 bg-[#11111a] flex flex-col justify-center">
+                        {view === 'auth' && (
+                            <form onSubmit={handleAuth} className="space-y-6 fade-in">
+                                <div className="flex gap-2 mb-8">
+                                    {['User', 'Recipe Master', 'Admin'].map(r => (
+                                        <button key={r} type="button" onClick={() => {setRole(r); setMsg({text:'', type:''});}} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase border transition ${role === r ? 'bg-violet-600 border-violet-600 shadow-lg shadow-violet-900/40' : 'border-white/5 bg-white/5 text-gray-500 hover:text-white'}`}>{r}</button>
+                                    ))}
+                                </div>
+                                <h3 className="text-3xl font-black italic uppercase">{mode === 'login' ? 'Authentication' : 'Registration'}</h3>
+                                <div className="space-y-4">
+                                    <input type="email" placeholder={`${mode === 'login' ? 'Logging in' : 'Registering'} as ${role}...`} className="w-full p-4 rounded-2xl text-sm" required onChange={e => setCreds({...creds, email: e.target.value})} />
+                                    <input type="password" placeholder="Access Key" className="w-full p-4 rounded-2xl text-sm" required onChange={e => setCreds({...creds, pass: e.target.value})} />
+                                </div>
+                                {msg.text && <p className={`text-xs font-mono p-3 rounded-lg bg-white/5 border ${msg.type === 'error' ? 'text-red-500 border-red-500/20' : 'text-green-500 border-green-500/20'}`}>{msg.text}</p>}
+                                <button disabled={loading} className="w-full bg-violet-600 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-violet-700 transition flex items-center justify-center gap-3">
+                                    {loading ? <i className="fas fa-circle-notch spinner text-xl"></i> : (mode === 'login' ? 'Authorize Access' : 'Generate OTP')}
+                                </button>
+                                <p className="text-center text-xs text-violet-400 cursor-pointer font-bold hover:underline" onClick={() => {setMode(mode === 'login' ? 'signup' : 'login'); setMsg({text:'', type:''});}}>{mode === 'login' ? 'New Subject? Register 1st' : 'Known Identity? Return to Login'}</p>
+                            </form>
+                        )}
+
+                        {view === 'otp' && (
+                            <div className="text-center space-y-8 fade-in">
+                                <div>
+                                    <h3 className="text-3xl font-black italic uppercase">Verify Email</h3>
+                                    <p className="text-gray-500 text-xs mt-2 font-mono">Sent to: {creds.email}</p>
+                                </div>
+                                <div className="flex justify-center">
+                                    <input type="text" maxLength="4" className="w-40 py-5 rounded-2xl text-center text-4xl font-black tracking-[0.5em] text-violet-400 focus:border-violet-500" placeholder="----" onChange={e => setOtp({...otp, input: e.target.value})} />
+                                </div>
+                                {msg.text && <p className="text-xs text-red-500 font-mono italic">{msg.text}</p>}
+                                <button onClick={verifyOtp} disabled={loading} className="w-full bg-green-600 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-green-700 transition flex items-center justify-center">
+                                    {loading ? <i className="fas fa-circle-notch spinner"></i> : 'Confirm Identity'}
+                                </button>
+                            </div>
+                        )}
+
+                        {view === 'setup' && (
+                            <form onSubmit={finalizeProfile} className="space-y-6 fade-in">
+                                <div>
+                                    <h3 className="text-3xl font-black italic uppercase">Subject Setup</h3>
+                                    <p className="text-gray-500 text-xs mt-1">Initialize your Lab Profile</p>
+                                </div>
+                                <div className="flex justify-center mb-6">
+                                    <label className="w-24 h-24 rounded-3xl bg-[#0a0a0f] border-2 border-dashed border-violet-500/50 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-violet-500 transition group relative">
+                                        {profile.pfp ? <img src={profile.pfp} className="w-full h-full object-cover" /> : <i className="fas fa-camera text-xl text-violet-500 group-hover:scale-110 transition"></i>}
+                                        <input type="file" className="hidden" accept="image/*" onChange={handlePfp} />
+                                    </label>
+                                </div>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="Full Legal Name" className="w-full p-4 rounded-2xl text-sm" required onChange={e => setProfile({...profile, name: e.target.value})} />
+                                    <input type="tel" placeholder="Contact Number" className="w-full p-4 rounded-2xl text-sm" required onChange={e => setProfile({...profile, phone: e.target.value})} />
+                                </div>
+                                <button className="w-full bg-violet-600 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-900/30 hover:bg-violet-700 transition">Initialize Profile</button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AccessPortal />);
+    </script>
+</body>
+</html>

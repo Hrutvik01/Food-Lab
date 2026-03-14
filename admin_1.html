@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE FOOD LAB | Root Control v3.0</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { background: #050505; color: #e2e8f0; font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden;}
+        
+        .sidebar { width: 280px; height: 100vh; position: fixed; background: #0a0a0f; border-right: 1px solid #1a1a24; z-index: 40; }
+        .main-content { margin-left: 280px; padding: 40px; background: radial-gradient(circle at top right, #11111a, #050505); min-height: 100vh; }
+        
+        .glass-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; padding: 24px; }
+        .glass-popup { background: #11111a; border-radius: 32px; width: 800px; max-width: 95%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #2d2d3d; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        
+        .nav-item { transition: 0.3s; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;}
+        .nav-item:hover, .nav-item.active { background: rgba(124, 58, 237, 0.1); color: #a78bfa; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #1a1a24; border-radius: 10px; }
+
+        .animate-pop { animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const AdminDashboard = () => {
+            const [users, setUsers] = useState([]);
+            const [globalRecipes, setGlobalRecipes] = useState([]);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [selectedSubject, setSelectedSubject] = useState(null); // For Dossier Modal
+            const chartRef = useRef(null);
+
+            const loadData = () => {
+                const userData = JSON.parse(localStorage.getItem('lab_users') || '[]');
+                const recipeData = JSON.parse(localStorage.getItem('lab_recipes') || '[]');
+                setUsers(userData);
+                setGlobalRecipes(recipeData);
+                renderChart(userData);
+            };
+
+            useEffect(() => {
+                loadData();
+                window.addEventListener('storage', loadData);
+                return () => window.removeEventListener('storage', loadData);
+            }, []);
+
+            const renderChart = (userData) => {
+                const ctx = document.getElementById('roleChart');
+                if (!ctx) return;
+                if (chartRef.current) chartRef.current.destroy();
+
+                const masters = userData.filter(u => u.role === 'Recipe Master').length;
+                const explorers = userData.filter(u => u.role === 'User').length;
+
+                chartRef.current = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Recipe Masters', 'Explorers'],
+                        datasets: [{
+                            data: [masters, explorers],
+                            backgroundColor: ['#f97316', '#8b5cf6'],
+                            borderColor: '#0a0a0f',
+                            borderWidth: 2,
+                            hoverOffset: 5
+                        }]
+                    },
+                    options: { plugins: { legend: { display: false } }, cutout: '75%' }
+                });
+            };
+
+            const downloadPDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFontSize(18);
+                doc.text("THE FOOD LAB | Root Audit Report", 14, 20);
+                doc.setFontSize(10);
+                doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+                
+                doc.autoTable({
+                    head: [["Subject Name", "Email", "Role", "XP Level", "Saved/Authored"]],
+                    body: users.map(u => {
+                        let count = 0;
+                        if(u.role === 'Recipe Master') {
+                            count = globalRecipes.filter(r => r.author === `@${(u.name || '').replace(/\s+/g, '_')}`).length;
+                        } else {
+                            count = (u.saved || []).length;
+                        }
+                        return [u.name || 'N/A', u.email, u.role, u.xp || 0, count];
+                    }),
+                    startY: 35,
+                    theme: 'grid',
+                    headStyles: { fillColor: [124, 58, 237] }
+                });
+                doc.save(`Lab_Audit_${Date.now()}.pdf`);
+            };
+
+            const deleteUser = (email) => {
+                if(confirm(`Eject Subject: ${email}? This action is irreversible.`)) {
+                    const filtered = users.filter(u => u.email !== email);
+                    localStorage.setItem('lab_users', JSON.stringify(filtered));
+                    setUsers(filtered);
+                    renderChart(filtered);
+                }
+            };
+
+            // Helpers for Dossier
+            const getMasterPublications = (masterName) => {
+                const tag = `@${(masterName || '').replace(/\s+/g, '_')}`;
+                return globalRecipes.filter(r => r.author === tag);
+            };
+
+            const filteredUsers = users.filter(u => 
+                u.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+
+            return (
+                <div className="flex">
+                    {/* SIDEBAR */}
+                    <aside className="sidebar flex flex-col justify-between p-8">
+                        <div>
+                            <div className="mb-12">
+                                <h2 className="text-2xl font-black italic text-violet-500 tracking-tighter">THE FOOD LAB</h2>
+                                <p className="text-[10px] text-gray-600 uppercase font-mono tracking-widest mt-1">Root Access v3.0</p>
+                            </div>
+                            <nav className="space-y-2">
+                                <div className="nav-item active"><i className="fas fa-database text-lg"></i> Personnel DB</div>
+                                <div className="nav-item opacity-50"><i className="fas fa-shield-halved text-lg"></i> Moderation</div>
+                                <div className="nav-item opacity-50"><i className="fas fa-bullhorn text-lg"></i> Broadcast Protocol</div>
+                            </nav>
+                        </div>
+
+                        <div className="space-y-4">
+                            <button onClick={downloadPDF} className="w-full py-4 bg-white/5 hover:bg-violet-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                <i className="fas fa-file-pdf"></i> PDF Report
+                            </button>
+                            <button onClick={() => window.location.href="login_1.html"} className="w-full py-4 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition">
+                                <i className="fas fa-sign-out-alt mr-2"></i> Lock Vault
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* MAIN */}
+                    <main className="main-content flex-1">
+                        <header className="flex justify-between items-end mb-12">
+                            <div>
+                                <h1 className="text-4xl font-black italic uppercase tracking-tighter">Personnel Control</h1>
+                                <p className="text-gray-500 text-xs mt-2 font-mono uppercase">Managing Global Sub-Subjects</p>
+                            </div>
+                            <div className="relative">
+                                <input type="text" placeholder="Search Subject..." className="bg-[#11111a] border border-[#2d2d3d] rounded-xl px-5 py-3 text-sm w-64 focus:border-violet-500 outline-none transition" onChange={e => setSearchTerm(e.target.value)} />
+                                <i className="fas fa-search absolute right-5 top-4 text-gray-600"></i>
+                            </div>
+                        </header>
+
+                        {/* Top Analytics */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                            <div className="glass-card flex items-center justify-between">
+                                <div><p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-2">Total Population</p><p className="text-5xl font-black">{users.length}</p></div>
+                                <div className="w-20 h-20"><canvas id="roleChart"></canvas></div>
+                            </div>
+                            <div className="glass-card border-l-4 border-orange-500 flex flex-col justify-center">
+                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-2">Recipe Masters</p>
+                                <p className="text-4xl font-black text-orange-500">{users.filter(u=>u.role==='Recipe Master').length}</p>
+                            </div>
+                            <div className="glass-card border-l-4 border-violet-500 flex flex-col justify-center">
+                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-2">Explorers</p>
+                                <p className="text-4xl font-black text-violet-400">{users.filter(u=>u.role==='User').length}</p>
+                            </div>
+                        </div>
+
+                        {/* Data Table */}
+                        <div className="bg-[#0a0a0f] rounded-3xl border border-[#1a1a24] overflow-hidden shadow-2xl">
+                            <table className="w-full text-left">
+                                <thead className="bg-[#11111a] text-[10px] text-gray-500 uppercase font-black tracking-widest">
+                                    <tr><th className="p-6">Identity Profile</th><th className="p-6">Contact Matrix</th><th className="p-6">Clearance & XP</th><th className="p-6 text-right">Protocol Actions</th></tr>
+                                </thead>
+                                <tbody>
+                                    {filteredUsers.length > 0 ? filteredUsers.map((u, i) => (
+                                        <tr key={i} className="border-t border-[#1a1a24] hover:bg-white/5 transition">
+                                            <td className="p-6 flex items-center gap-4">
+                                                <img src={u.pfp || 'https://via.placeholder.com/150'} className="w-10 h-10 rounded-xl object-cover border border-white/10" />
+                                                <div><p className="font-bold text-sm tracking-tight">{u.name || 'Unknown'}</p><p className="text-[10px] font-mono text-gray-500">{u.email}</p></div>
+                                            </td>
+                                            <td className="p-6 font-mono text-xs text-gray-400">{u.phone || 'N/A'}</td>
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-3 py-1 bg-white/5 border rounded-lg text-[9px] font-black uppercase tracking-widest ${u.role === 'Recipe Master' ? 'text-orange-400 border-orange-500/30' : 'text-violet-400 border-violet-500/30'}`}>{u.role}</span>
+                                                    <span className="text-xs font-bold">{u.xp || 0} XP</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button onClick={() => setSelectedSubject(u)} className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-600 hover:text-white transition flex items-center justify-center" title="Inspect Subject Dossier">
+                                                        <i className="fas fa-eye"></i>
+                                                    </button>
+                                                    <button onClick={() => deleteUser(u.email)} className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center" title="Eject Subject">
+                                                        <i className="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan="4" className="p-16 text-center text-gray-600 font-mono italic text-xs">No subjects located in query.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </main>
+
+                    {/* SUBJECT DOSSIER MODAL */}
+                    {selectedSubject && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setSelectedSubject(null)}></div>
+                            <div className="glass-popup relative animate-pop flex flex-col">
+                                
+                                {/* Modal Header / Subject Profile */}
+                                <div className="p-8 border-b border-[#2d2d3d] bg-[#0a0a0f] flex justify-between items-start">
+                                    <div className="flex items-center gap-6">
+                                        <div className="relative">
+                                            <img src={selectedSubject.pfp || 'https://via.placeholder.com/150'} className="w-24 h-24 rounded-2xl object-cover border-2 border-[#2d2d3d]" />
+                                            <div className={`absolute -bottom-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center text-[10px] text-white ${selectedSubject.role === 'Recipe Master' ? 'bg-orange-600' : 'bg-violet-600'}`}>
+                                                <i className={`fas ${selectedSubject.role === 'Recipe Master' ? 'fa-fire' : 'fa-user'}`}></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-3xl font-black italic uppercase tracking-tighter mb-1">{selectedSubject.name || 'Unknown Subject'}</h2>
+                                            <div className="flex gap-4 text-xs font-mono text-gray-500 mb-3">
+                                                <span><i className="fas fa-envelope mr-1"></i> {selectedSubject.email}</span>
+                                                <span><i className="fas fa-phone mr-1"></i> {selectedSubject.phone || 'N/A'}</span>
+                                            </div>
+                                            <div className="flex gap-3 items-center">
+                                                <span className={`px-3 py-1 rounded text-[9px] font-black uppercase tracking-widest ${selectedSubject.role === 'Recipe Master' ? 'bg-orange-500/20 text-orange-400' : 'bg-violet-500/20 text-violet-400'}`}>{selectedSubject.role}</span>
+                                                <span className="text-xs font-bold bg-white/5 px-3 py-1 rounded">{selectedSubject.xp || 0} XP Accumulated</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedSubject(null)} className="text-gray-500 hover:text-white transition"><i className="fas fa-times text-2xl"></i></button>
+                                </div>
+
+                                {/* Modal Body / Sub-Database Details */}
+                                <div className="flex-1 p-8 overflow-y-auto no-scrollbar bg-[#11111a]">
+                                    
+                                    {selectedSubject.role === 'User' ? (
+                                        // USER LOGIC: Display Recipe Book (Saved array)
+                                        <div>
+                                            <h3 className="text-[10px] font-black uppercase text-violet-500 tracking-widest mb-6 border-b border-[#2d2d3d] pb-2"><i className="fas fa-bookmark mr-2"></i> Subject's Recipe Book Data</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {(selectedSubject.saved && selectedSubject.saved.length > 0) ? selectedSubject.saved.map((savedRecipe, i) => (
+                                                    <div key={i} className="flex gap-4 items-center p-3 bg-[#0a0a0f] border border-[#1a1a24] rounded-xl">
+                                                        <img src={savedRecipe.mainImg || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-lg object-cover" />
+                                                        <div>
+                                                            <p className="font-bold text-xs truncate">{savedRecipe.title}</p>
+                                                            <p className="text-[9px] font-mono text-gray-500">{savedRecipe.author}</p>
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="col-span-full p-8 text-center border border-dashed border-[#2d2d3d] rounded-2xl">
+                                                        <p className="text-gray-600 font-mono italic text-xs">No experiments saved by this subject.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Show Reagents Inventory */}
+                                            <h3 className="text-[10px] font-black uppercase text-violet-500 tracking-widest mb-4 mt-8 border-b border-[#2d2d3d] pb-2"><i className="fas fa-flask mr-2"></i> Current Reagent Inventory (Cart)</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {(selectedSubject.reagents && selectedSubject.reagents.length > 0) ? selectedSubject.reagents.map((r, i) => (
+                                                    <span key={i} className="px-3 py-1.5 bg-[#0a0a0f] border border-[#1a1a24] rounded-lg text-[10px] font-mono text-gray-400">{r}</span>
+                                                )) : (
+                                                    <span className="text-gray-600 font-mono italic text-xs">Inventory empty.</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // RECIPE MASTER LOGIC: Display Created Protocols (Global database cross-reference)
+                                        <div>
+                                            <h3 className="text-[10px] font-black uppercase text-orange-500 tracking-widest mb-6 border-b border-[#2d2d3d] pb-2"><i className="fas fa-fire mr-2"></i> Master's Published Protocols</h3>
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {getMasterPublications(selectedSubject.name).length > 0 ? getMasterPublications(selectedSubject.name).map((pub, i) => (
+                                                    <div key={i} className="flex gap-5 items-center p-4 bg-[#0a0a0f] border border-[#1a1a24] rounded-2xl">
+                                                        <img src={pub.mainImg || 'https://via.placeholder.com/80'} className="w-20 h-20 rounded-xl object-cover" />
+                                                        <div className="flex-1">
+                                                            <h4 className="font-black italic text-lg">{pub.title}</h4>
+                                                            <div className="flex gap-4 mt-2">
+                                                                <span className="text-[10px] font-mono text-gray-500 uppercase"><i className="fas fa-list-ol mr-1"></i> {pub.steps.length} Phases</span>
+                                                                <span className="text-[10px] font-mono text-gray-500 uppercase"><i className="fas fa-vial mr-1"></i> {pub.ingredients.length} Reagents</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Global ID</span>
+                                                            <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded">#{pub.id}</span>
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="p-8 text-center border border-dashed border-[#2d2d3d] rounded-2xl">
+                                                        <p className="text-gray-600 font-mono italic text-xs">Master has not published any protocols to the global feed.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AdminDashboard />);
+    </script>
+</body>
+</html>
